@@ -1,0 +1,102 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Архив</title>
+<style>
+:root{--bg:#f6f3ff;--p:#fff;--ink:#241a45;--mute:#7b7399;--line:#e4dcfa;--a:#6d4aff;--a2:#9b7bff;--soft:#efe9ff;--ok:#1f9d6b;--warn:#c2851c;--err:#d6405a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+#app{max-width:1040px;margin:0 auto;padding:18px;transition:filter .3s}#app.locked{filter:blur(9px);pointer-events:none;user-select:none}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}h1{font-size:20px;margin:0;color:var(--a)}
+nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}nav button{border:0;background:var(--p);color:var(--mute);padding:9px 16px;border-radius:20px;font:inherit;cursor:pointer;border:1px solid var(--line)}
+nav button.on{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border-color:transparent}
+section{display:none}section.on{display:block}
+.card{background:var(--p);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 4px 18px rgba(109,74,255,.06)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.num{font-size:30px;font-weight:700;color:var(--a)}.mute{color:var(--mute)}.bar{height:6px;background:var(--soft);border-radius:3px;margin-top:8px}.bar i{display:block;height:100%;background:var(--a);border-radius:3px}
+.chip{display:inline-block;background:var(--soft);border-radius:14px;padding:3px 11px;margin:3px 4px 3px 0}.chip b{color:var(--a)}
+table{width:100%;border-collapse:collapse}td,th{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--mute);font-weight:500}
+.s{font-weight:600}.running{color:var(--a)}.done{color:var(--ok)}.error{color:var(--err)}.limit,.paused,.queued{color:var(--warn)}
+button.b,form button{background:linear-gradient(135deg,var(--a),var(--a2));color:#fff;border:0;border-radius:10px;padding:9px 16px;font:inherit;cursor:pointer}
+button.g{background:var(--p);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font:inherit;cursor:pointer}
+input,textarea,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font:inherit}label{display:block;margin:10px 0 4px}
+.row{display:flex;gap:10px;align-items:end}.row>*{flex:1}.row>button{flex:0 0 auto}
+.ext{display:inline-block;background:var(--a);color:#fff;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600}
+#log{height:60vh;overflow:auto;background:var(--p);border:1px solid var(--line);border-radius:14px;padding:12px;font:13px/1.7 ui-monospace,Consolas,monospace}#log .warn{color:var(--warn)}#log .error{color:var(--err)}
+#lock{position:fixed;inset:0;display:none;place-items:center;background:rgba(246,243,255,.55);backdrop-filter:blur(7px);z-index:9}#lock.on{display:grid}
+#lock form{background:var(--p);border:1px solid var(--line);border-radius:18px;padding:28px;width:min(360px,92vw);box-shadow:0 20px 60px rgba(109,74,255,.25)}
+#lock h2{margin:0 0 4px;color:var(--a)}#err{color:var(--err);min-height:22px;margin:8px 0 0}:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+</style></head><body>
+<div id="app" class="locked">
+<header><h1>Архив пересылок</h1><div><button class="g" id="stopall" style="color:var(--err)">Остановить всё</button> <button class="g" id="out">Выйти</button></div></header>
+<nav><button data-t="ov" class="on">Обзор</button><button data-t="jobs">Задачи</button><button data-t="all">Переслать всё</button><button data-t="chan">Из канала</button><button data-t="find">Поиск файлов</button><button data-t="logs">Логи</button></nav>
+<section id="ov" class="on">
+ <div class="grid"><div class="card"><div class="mute">Файлов в группе</div><div class="num" id="nf">0</div></div>
+ <div class="card"><div class="mute">Веток</div><div class="num" id="nt">0</div></div>
+ <div class="card"><div class="mute">Переслано сегодня</div><div class="num"><span id="today">0</span><span class="mute" style="font-size:16px"> / <span id="cap">0</span></span></div><div class="bar"><i id="bar" style="width:0"></i></div></div></div>
+ <div class="card"><div class="row"><div><label for="capin">Дневной лимит пересылки</label><input id="capin" type="number" min="1"></div><button class="g" id="capb">Сохранить</button></div></div>
+ <div class="card"><div class="row"><div><b>Индекс группы</b><div class="mute" id="scanmsg">Сканирование нужно один раз, чтобы видеть уже лежащие файлы.</div></div><button class="b" id="scanb">Пересканировать группу</button></div></div>
+ <div class="card"><b>Ветки и количество файлов</b><div id="topics" style="margin-top:8px"></div></div>
+ <div class="card"><b>Переслано по датам</b><table><tbody id="days"></tbody></table></div>
+</section>
+<section id="jobs">
+ <form id="f" class="card"><label for="lines">Откуда и куда: ссылка на топик-источник, ниже ссылка на топик-приёмник. Или в одну строку через « | ». Несколько задач можно писать подряд.</label>
+ <textarea id="lines" rows="5" required placeholder="https://t.me/c/1111111111/5 | https://t.me/c/2222222222/12&#10;https://t.me/c/1111111111/8 | https://t.me/c/2222222222/14"></textarea>
+ <div class="row"><div><label for="at">Начать в (пусто = сразу)</label><input id="at" type="datetime-local"></div><div><label for="pz">Пауза между отправками, сек</label><input id="pz" type="number" value="2" min="1"></div><button>Добавить в очередь</button></div><div id="fe" style="margin-top:10px;min-height:22px"></div>
+ <p class="mute">Задачи идут по очереди. Поставь время, добавь несколько строк и можно идти спать.</p></form>
+ <div class="card"><table><thead><tr><th>№</th><th>Маршрут</th><th>Статус</th><th>Переслано</th><th></th></tr></thead><tbody id="jl"></tbody></table></div>
+</section>
+<section id="all"><form id="af" class="card">
+<label for="asrc">Группа-источник (ссылка или id)</label><input id="asrc" required placeholder="https://t.me/c/4440819293">
+<label for="adst">Куда: группа (ветки создадутся с теми же названиями) или ссылка на одну ветку (всё ляжет в неё)</label><input id="adst" required placeholder="https://t.me/c/4296478405">
+<div class="row"><div><label for="asp">Скорость</label><select id="asp"><option value="1">Точно: по одному сообщению (очень медленно)</option><option value="10">Средне: пачки по 10</option><option value="50" selected>Быстро: пачки по 50</option></select></div>
+<div><label for="aat">Начать в (пусто = сразу)</label><input id="aat" type="datetime-local"></div><button>Запустить</button></div>
+<div class="row" style="margin-top:8px"><button type="button" class="g" id="auditb">Сверить количество файлов по веткам</button></div><div id="ae" style="margin-top:10px;min-height:22px"></div>
+<p class="mute">Бот пройдёт по всем веткам источника и перешлёт только файлы (без текста), пропуская дубликаты по названию. Для каждой ветки появится отдельная задача. Не забудь поднять дневной лимит в «Обзоре».</p></form></section>
+<section id="chan"><form id="cf" class="card">
+<label for="csrc">Канал-источник (ссылка t.me/c/… или id)</label><input id="csrc" required placeholder="https://t.me/c/1234567890">
+<label for="cdst">Наша группа (ссылка на группу целиком)</label><input id="cdst" required placeholder="https://t.me/c/4296478405">
+<div class="row"><div><label for="csp">Скорость</label><select id="csp"><option value="10">Средне: пачки по 10</option><option value="50" selected>Быстро: пачки по 50</option></select></div>
+<div><label for="cat">Начать в (пусто = сразу)</label><input id="cat" type="datetime-local"></div><button>Запустить</button></div>
+<div id="ce" style="margin-top:10px;min-height:22px"></div>
+<p class="mute">Пересылается всё, и файлы, и текст. Если название файла (или любого файла из альбома) похоже на название нашей ветки, он уходит в неё. Учитываются опечатки, кириллица и латиница: «ощабанк87688» попадёт в «Ощадбанк». Файлы без совпадения уходят в ветку с названием канала (создаётся сама). Текст идёт туда же, куда предыдущий файл.</p></form></section>
+<section id="find"><div class="card"><form id="sf" class="row"><div><label for="q">Название файла</label><input id="q" placeholder="москва.zip" required></div><button>Найти</button></form></div><div id="vars" class="mute" style="margin-bottom:8px"></div><div id="exts" style="margin-bottom:10px"></div><div id="res" class="grid"></div></section>
+<section id="logs"><div id="log"></div></section>
+</div>
+<div id="lock" class="on"><form id="lf"><h2>Вход</h2><div class="mute">Админ-панель архива</div>
+<label for="u">Логин</label><input id="u" autocomplete="username" required><label for="p">Пароль</label><input id="p" type="password" autocomplete="current-password" required>
+<div id="err"></div><button style="width:100%">Войти</button></form></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sz=n=>n>1e9?(n/1e9).toFixed(1)+' ГБ':n>1e6?(n/1e6).toFixed(1)+' МБ':n>1e3?Math.round(n/1e3)+' КБ':(n||0)+' Б';
+async function api(p,b,m){const o={method:m||(b!==undefined?'POST':'GET'),headers:{'X-Req':'1'}};if(b){o.headers['Content-Type']='application/json';o.body=JSON.stringify(b)}
+ const r=await fetch(p,o);if(r.status==401&&p!='/api/login'){lock(true);throw 'auth'}if(!r.ok){let t=await r.text();try{t=JSON.parse(t).detail}catch{}throw t}return r.json()}
+let timer;function lock(on){$('#app').classList.toggle('locked',on);$('#lock').classList.toggle('on',on);clearInterval(timer);if(!on){tick();timer=setInterval(tick,3000)}}
+function show(t){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t))}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+$('#lf').onsubmit=async e=>{e.preventDefault();$('#err').textContent='';try{await api('/api/login',{user:$('#u').value,password:$('#p').value});$('#p').value='';lock(false)}catch(x){$('#err').textContent=x}};
+$('#stopall').onclick=()=>{if(confirm('Остановить активную задачу и очистить очередь?'))api('/api/stop_all',null,'POST').then(tick).catch(alert)};
+$('#out').onclick=async()=>{await api('/api/logout',null,'POST').catch(()=>{});lock(true)};
+const names={queued:'в очереди',running:'идёт',paused:'пауза',stopped:'остановлено',limit:'ждёт лимит',done:'готово',error:'ошибка'};
+const btns=j=>['running','queued','limit'].includes(j.status)?`<button class="g" data-id="${j.id}" data-a="pause">Пауза</button> <button class="g" data-id="${j.id}" data-a="stop">Стоп</button>`:['paused','stopped','error'].includes(j.status)?`<button class="g" data-id="${j.id}" data-a="resume">Продолжить</button>`:'';
+$('#jl').onclick=e=>{const b=e.target.closest('button');if(b)api(`/api/jobs/${b.dataset.id}/${b.dataset.a}`,null,'POST').then(tick)};
+let tk=0,last=0;
+async function tick(){try{const s=await api('/api/state');
+ $('#today').textContent=s.today;$('#cap').textContent=s.cap;$('#bar').style.width=Math.min(100,s.today/s.cap*100)+'%';if(document.activeElement!==$('#capin'))$('#capin').value=s.cap;
+ if(s.scan.msg)$('#scanmsg').textContent='Скан: '+s.scan.msg;$('#scanb').disabled=s.scan.run;
+ $('#jl').innerHTML=s.jobs.map(j=>{const p=j.total?Math.min(100,Math.round(j.forwarded/j.total*100)):0;return `<tr><td>${j.id}</td><td>${j.mode=='channel'?esc(j.src_chat)+' (канал) → '+esc(j.dst_chat)+' по веткам':esc(j.src_chat)+'/'+j.src_topic+' → '+esc(j.dst_chat)+'/'+j.dst_topic}${j.start_at&&j.status=='queued'?`<div class="mute">старт: ${esc(new Date(j.start_at).toLocaleString())}</div>`:''}${j.error?`<div class="error">${esc(j.error)}</div>`:''}</td><td class="s ${j.status}">${names[j.status]||j.status}</td><td>${j.forwarded} / ${j.total} (${p}%)</td><td>${btns(j)}</td></tr>`}).join('');
+ const r=await api('/api/logs?after='+last);if(r.length){const b=$('#log'),end=b.scrollTop+b.clientHeight>=b.scrollHeight-20;r.forEach(l=>{last=l.id;const d=document.createElement('div');d.className=l.level;d.textContent=`${l.ts.slice(5,19).replace('T',' ')} ${l.job_id?'#'+l.job_id+' ':''}${l.msg}`;b.append(d)});if(end)b.scrollTop=b.scrollHeight}
+ if(tk++%3==0){const t=await api('/api/stats');$('#nf').textContent=t.files;$('#nt').textContent=t.topics.length;
+  const mx=Math.max(1,...t.topics.map(x=>x.n));$('#topics').innerHTML=t.topics.map(x=>`<div style="margin:7px 0"><div style="display:flex;justify-content:space-between"><span>${esc(x.title)}</span><b>${x.n}</b></div><div class="bar" style="margin-top:3px"><i style="width:${x.n/mx*100}%"></i></div></div>`).join('')||'<span class="mute">Пока пусто. Нажми «Пересканировать группу».</span>';
+  $('#days').innerHTML=t.days.map(x=>`<tr><td>${esc(x.day)}</td><td><b>${x.n}</b> файлов</td></tr>`).join('')||'<tr><td class="mute">Пока ничего не переслано</td></tr>'}
+}catch(x){if(x!='auth')console.log(x)}}
+$('#capb').onclick=()=>api('/api/cap',{cap:+$('#capin').value}).then(tick);
+$('#scanb').onclick=()=>api('/api/scan',null,'POST').then(tick).catch(alert);
+$('#f').onsubmit=async e=>{e.preventDefault();try{const r=await api('/api/jobs',{lines:$('#lines').value,pause_s:+$('#pz').value,start_at:$('#at').value?new Date($('#at').value).toISOString():null});$('#lines').value='';$('#fe').style.color='var(--ok)';$('#fe').textContent='Добавлено в очередь: №'+r.ids.join(', №');tick()}catch(x){$('#fe').style.color='var(--err)';$('#fe').textContent=x}};
+$('#af').onsubmit=async e=>{e.preventDefault();const m=$('#ae');try{await api('/api/mirror',{src:$('#asrc').value,dst:$('#adst').value,batch:+$('#asp').value,pause_s:1,start_at:$('#aat').value?new Date($('#aat').value).toISOString():null});m.style.color='var(--ok)';m.textContent='Запущено: ветки готовятся, задачи появятся во вкладке «Задачи», ход в «Логи».'}catch(x){m.style.color='var(--err)';m.textContent=x}};
+$('#cf').onsubmit=async e=>{e.preventDefault();const m=$('#ce');try{await api('/api/channel',{src:$('#csrc').value,dst:$('#cdst').value,batch:+$('#csp').value,pause_s:1,start_at:$('#cat').value?new Date($('#cat').value).toISOString():null});m.style.color='var(--ok)';m.textContent='Задача добавлена, смотри вкладки «Задачи» и «Логи».'}catch(x){m.style.color='var(--err)';m.textContent=x}};
+$('#auditb').onclick=async()=>{const m=$('#ae');try{await api('/api/audit',{src:$('#asrc').value,dst:$('#adst').value});m.style.color='var(--ok)';m.textContent='Сверка запущена, результат по каждой ветке во вкладке «Логи».'}catch(x){m.style.color='var(--err)';m.textContent=x}};
+let R=[],EX='';
+function paint(){const f=EX?R.filter(x=>(x.ext||'file')==EX):R,ex=[...new Set(R.map(x=>x.ext||'file'))];
+ $('#exts').innerHTML=ex.length>1?ex.map(e=>`<button type="button" class="g" data-e="${esc(e)}" style="${e==EX?'border-color:var(--a);color:var(--a)':''}">${esc(e)}</button>`).join(' '):'';
+ $('#res').innerHTML=f.map(x=>`<div class="card"><span class="ext">${esc(x.ext||'file')}</span> <span class="mute">${Math.round(x.score*100)}%</span><div style="margin:8px 0;word-break:break-word"><b>${esc(x.name)}</b></div><div class="mute">Ветка: ${esc(x.topic_title||'—')}</div><div class="mute">Размер: ${sz(x.size)}</div></div>`).join('')||'<div class="card mute">Ничего не найдено. Если индекс пуст, нажми «Пересканировать группу» в «Обзоре».</div>'}
+$('#exts').onclick=e=>{const b=e.target.closest('button');if(b){EX=EX==b.dataset.e?'':b.dataset.e;paint()}};
+$('#sf').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/search?q='+encodeURIComponent($('#q').value));R=d.results;EX='';$('#vars').textContent='Искали: '+d.variants.join(' · ');paint()}catch(x){$('#vars').textContent=x}};
+api('/api/me').then(()=>lock(false)).catch(()=>lock(true));
+</script></body></html>
