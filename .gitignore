@@ -1,5 +1,9 @@
-# Object file
-*.o
-
-# Ada Library Information
-*.ali
+__pycache__/
+*.session
+*.session-journal
+.env
+.venv/
+qr.png
+qr_tmp.png
+qr.html
+config.py
